@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tablas como Imágenes</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="contenedor-tablas"></div>
+  <button onclick="descargar()">Descargar Imágenes</button>
+
+  <script>
+    async function cargarTablas() {
+      const id = 'AKfycbxsmEhE8lN11MEHDJE78Y5X0UL3jGU2f_l2XOGRvT97Pm4vfAUhaAhANwlia9og8rukrQ'; // Reemplaza con tu ID de Google Apps Script
+      const url = `https://script.google.com/macros/s/${id}/exec`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) {
+        console.error('Error al cargar las tablas:', res.statusText);
+        return;
+      }
+      const tablas = await res.json();
+      const contenedor = document.getElementById('contenedor-tablas');
+
+      tablas.forEach((tabla, idx) => {
+        const table = document.createElement('table');
+        table.style.borderCollapse = 'collapse';
+        table.style.marginBottom = '30px';
+
+        tabla.forEach(row => {
+          const tr = document.createElement('tr');
+          row.forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            td.style.border = '1px solid black';
+            td.style.padding = '4px 8px';
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'tabla-img';
+        wrapper.appendChild(table);
+        contenedor.appendChild(wrapper);
+      });
+    }
+
+    async function descargar() {
+      const wrappers = document.querySelectorAll('.tabla-img');
+      for (let i = 0; i < wrappers.length; i++) {
+        const canvas = await html2canvas(wrappers[i]);
+        const link = document.createElement('a');
+        link.download = `tabla_${i + 1}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+      }
+    }
+
+    cargarTablas();
+  </script>
+</body>
+</html>

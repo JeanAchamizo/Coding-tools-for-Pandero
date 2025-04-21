@@ -1,0 +1,2 @@
+comando pegar en powershell: // esto es importante para abrir el chrome y automatizar
+	& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\selenium\ChromeProfile"
