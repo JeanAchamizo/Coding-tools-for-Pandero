@@ -32,6 +32,7 @@ class ContratoAutomatizador:
     def obtener_dato_google_sheet(self, row, column):
         url = f"https://script.google.com/macros/s/{self.google_sheet_id}/exec?row={row}&column={column}"
         response = requests.get(url)
+        print(url)
         contrato = response.text
         return contrato.split(":")[1].strip() if contrato else None #7507-080-26 
 
@@ -176,39 +177,53 @@ class ContratoAutomatizador:
             return None
 
     def automatizar_proceso(self, row_inicial=2, row_final=2):
-        # Obtener los contratos en el rango especificado
         contratos = self.obtener_datos_google_sheet(row_inicial, row_final, self.columna_contrato)
-        cuotas_pagadas = []  # Lista para almacenar las cuotas pagadas
-        estados = []  # Lista para almacenar los estados (Pagado/No Pagado)
+        valores_certificado = []
+        fechas_certificado = []
+        procesados = 0
+        cache_scraping = {}  # Diccionario para no repetir scraping en la misma iteración
     
         for contrato in contratos:
-            print("Procesando contrato:", contrato)
-            cuota_pagada, ultima_fecha_cia = self.verificar_contrato_en_intranet(contrato)
-            cuotas_pagadas.append(cuota_pagada)
-            estados.append(ultima_fecha_cia if ultima_fecha_cia else "No Pagado")
-
-        # Enviar las cuotas pagadas al endpoint en un solo llamado
-        print("Actualizando cuotas pagadas en Google Sheets...")
-        self.actualizar_rango_google_sheet(row_inicial, row_final, self.columna_cuota, cuotas_pagadas)
+            # Si ya hicimos scraping de este contrato en esta iteración, reutiliza el valor
+            if contrato in cache_scraping:
+                valor_certificado = cache_scraping[contrato]
+                print(f"Contrato {contrato} ya fue scrapeado en esta iteración, se reutiliza el valor: {valor_certificado}")
+                valores_certificado.append(valor_certificado)
+                procesados += 1
+                continue
     
-        # Enviar los estados al endpoint en un solo llamado
-        self.actualizar_rango_google_sheet(row_inicial, row_final, self.columna_estado, estados)
-
+            try:
+                print("Procesando contrato:", contrato)
+                valor_certificado, fecha_Cia = self.verificar_contrato_en_intranet(contrato)
+                cache_scraping[contrato] = valor_certificado  # Guardar en cache
+                valores_certificado.append(valor_certificado)
+                fechas_certificado.append(fecha_Cia)
+                procesados += 1
+            except Exception as e:
+                print(f"Error al procesar contrato {contrato}: {e}")
+                break
+    
+        if procesados > 0:
+            print("Actualizando valores de certificado en Google Sheets (solo los procesados)...")
+            self.actualizar_rango_google_sheet(row_inicial, row_inicial + procesados - 1, self.columna_cuota, valores_certificado)
+            self.actualizar_rango_google_sheet(row_inicial, row_inicial + procesados - 1, self.columna_estado, fechas_certificado)
+        else:
+            print("No se procesó ningún contrato correctamente.")
 # Ejecutar la automatización
 if __name__ == "__main__":
 
     #Link de prueba
     google_sheet_id = "AKfycbz2RL-OD9quDrOT_MRqFkNrnttTRIxZHWSwwByv7WgR2m5SV_KVWxtsbitTV_drwJ9Y"
     #Link de producción
-    #google_sheet_id = "AKfycbz9vkiLAOm5VucnSadIIdUQbWUzoCgNAHogtxKMSUFkN9cmyj-I1qNxQg5QGL1IQ78QRw" # ID de tu Google Sheet
+    #google_sheet_id = "AKfycbzKxGsLFQmhLosNoUMLZSGiQXTiBNESqlyodAdXIr_RBG1FjRQPfxtOiF97GLmEXDlM"
     
     # Convertir letras de columna a números // cambia la columna según tu hoja de cálculo
-    columna_contrato = ContratoAutomatizador.letra_a_numero_columna("E")  # Salida: 5
-    columna_cuota = ContratoAutomatizador.letra_a_numero_columna("L")     # Salida: 14
-    columna_estado = ContratoAutomatizador.letra_a_numero_columna("N")    # Salida: 16
+    columna_contratos = ContratoAutomatizador.letra_a_numero_columna("E")  # Salida: 5
+    columna_cuota_monto = ContratoAutomatizador.letra_a_numero_columna("L")     # Salida: 14
+    columna_estado_fecha = ContratoAutomatizador.letra_a_numero_columna("N")    # Salida: 16
 
-    fila_inicial = 2 # Fila inicial para la automatización
-    fila_final = 17 # Fila final para la automatización
+    fila_inicial = 45# Fila inicial para la automatización
+    fila_final = 101 #Fila final para la automatización
 
-    automatizador = ContratoAutomatizador(google_sheet_id, columna_contrato, columna_cuota, columna_estado)
+    automatizador = ContratoAutomatizador(google_sheet_id, columna_contratos, columna_cuota_monto, columna_estado_fecha)
     automatizador.automatizar_proceso(fila_inicial,fila_final)
